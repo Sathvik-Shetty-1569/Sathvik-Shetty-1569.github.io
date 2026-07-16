@@ -257,6 +257,10 @@
   .icon-row a:hover{ color:var(--ink); }
   @media (max-width:600px){ .form-row{ grid-template-columns:1fr; } .contact-card{ padding:34px 22px; } }
   .foot-meta{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; font-size:0.78rem; color:var(--muted); border-top:1px solid var(--line); padding-top:22px; }
+  .form-status{ margin-top:14px; font-size:0.85rem; text-align:center; display:none; }
+  .form-status.success{ color:#2E9E4F; display:block; }
+  .form-status.error{ color:#C4600C; display:block; }
+  .form-status.sending{ color:var(--muted); display:block; }
 
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior:auto; }
@@ -612,22 +616,25 @@
     <div class="heading-underline"></div>
     <p class="contact-sub">I'm open to AI/LLM Engineer roles, collaborations, and interesting problems. Whether it's an opportunity, a project, or just a question — I'd love to hear from you.</p>
     <form id="contactForm" class="contact-form">
+      <input type="hidden" name="access_key" value="b820b2de-edc4-467c-bc46-4f39e65c613d">
+      <input type="hidden" name="subject" value="New portfolio contact message">
+      <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
       <div class="form-row">
         <div class="form-field">
           <label for="cf-name">Name</label>
-          <input type="text" id="cf-name" placeholder="Your name" required>
+          <input type="text" id="cf-name" name="name" placeholder="Your name" required>
         </div>
         <div class="form-field">
           <label for="cf-email">Email</label>
-          <input type="email" id="cf-email" placeholder="Your email" required>
+          <input type="email" id="cf-email" name="email" placeholder="Your email" required>
         </div>
       </div>
       <div class="form-field">
         <label for="cf-message">Message</label>
-        <textarea id="cf-message" rows="5" placeholder="Tell me about your project, idea, or opportunity..." required></textarea>
+        <textarea id="cf-message" name="message" rows="5" placeholder="Tell me about your project, idea, or opportunity..." required></textarea>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn-primary btn-icon">
+        <button type="submit" class="btn-primary btn-icon" id="submitBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           Send message
         </button>
@@ -636,6 +643,7 @@
           Or email me
         </a>
       </div>
+      <div class="form-status" id="formStatus"></div>
     </form>
   </div>
 
@@ -794,17 +802,50 @@
     frame();
   }
 
-  // Contact form -> opens the visitor's mail client with the message pre-filled
+  // Contact form -> sends via Web3Forms (no backend needed), falls back gracefully on error
   const contactForm = document.getElementById('contactForm');
+  const formStatus = document.getElementById('formStatus');
+  const submitBtn = document.getElementById('submitBtn');
+
   if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
+    contactForm.addEventListener('submit', function (e) {
       e.preventDefault();
-      const name = document.getElementById('cf-name').value.trim();
-      const email = document.getElementById('cf-email').value.trim();
-      const message = document.getElementById('cf-message').value.trim();
-      const subject = encodeURIComponent('Portfolio contact from ' + name);
-      const body = encodeURIComponent(message + '\n\n— ' + name + ' (' + email + ')');
-      window.location.href = 'mailto:sathvikshetty189@gmail.com?subject=' + subject + '&body=' + body;
+
+      const accessKey = contactForm.querySelector('[name="access_key"]').value;
+      if (!accessKey || accessKey === 'YOUR_WEB3FORMS_ACCESS_KEY_HERE') {
+        formStatus.textContent = 'Form is not fully set up yet — use "Or email me" instead.';
+        formStatus.className = 'form-status error';
+        return;
+      }
+
+      formStatus.textContent = 'Sending...';
+      formStatus.className = 'form-status sending';
+      submitBtn.disabled = true;
+
+      const formData = new FormData(contactForm);
+
+      fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: formData
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          submitBtn.disabled = false;
+          if (data.success) {
+            formStatus.textContent = 'Message sent — thanks! I\'ll get back to you soon.';
+            formStatus.className = 'form-status success';
+            contactForm.reset();
+          } else {
+            formStatus.textContent = 'Something went wrong — please use "Or email me" instead.';
+            formStatus.className = 'form-status error';
+          }
+        })
+        .catch(function () {
+          submitBtn.disabled = false;
+          formStatus.textContent = 'Network error — please use "Or email me" instead.';
+          formStatus.className = 'form-status error';
+        });
     });
   }
 
